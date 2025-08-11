@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClassifyMyNotes - AI для ваших конспектов</title>
+
+    <!-- MathJax для красивых формул -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+    </script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        .highlight-important {
+            background: #fed7d7;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            display: flex;
+            background: #f8fafc;
+            padding: 2rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .progress-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+
+        .progress-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            right: -50%;
+            width: 100%;
+            height: 2px;
+            background: #e2e8f0;
+            z-index: 1;
+        }
+
+        .progress-step.active::after {
+            background: #667eea;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 0.5rem;
+            font-weight: 600;
+            position: relative;
+            z-index: 2;
+        }
+
+        .progress-step.active .step-number {
+            background: #667eea;
+            color: white;
+        }
+
+        .progress-step.completed .step-number {
+            background: #10b981;
+            color: white;
+        }
+
+        .step-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .content-section {
+            padding: 2rem;
+        }
+
+        .upload-area {
+            border: 3px dashed #e2e8f0;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #fafbfc;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8faff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            background: #667eea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+        }
+
+        .upload-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1e293b;
+        }
+
+        .upload-subtext {
+            color: #64748b;
+            margin-bottom: 1rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn.btn-secondary {
+            background: #64748b;
+        }
+
+        .btn.btn-secondary:hover {
+            background: #475569;
+        }
+
+        .analysis-section {
+            display: none;
+            padding: 2rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .analysis-card {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .card-definitions { border-left-color: #10b981; }
+        .card-examples { border-left-color: #f59e0b; }
+        .card-theorems { border-left-color: #ef4444; }
+        .card-dates { border-left-color: #8b5cf6; }
+        .card-formulas { border-left-color: #06b6d4; }
+
+        .card-title {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-content {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .highlighted-text {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            margin: 2rem 0;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+
+        .highlight-definition { background: #dcfce7; padding: 2px 4px; border-radius: 3px; }
+        .highlight-example { background: #fef3c7; padding: 2px 4px; border-radius: 3px; }
+        .highlight-theorem { background: #fee2e2; padding: 2px 4px; border-radius: 3px; }
+        .highlight-date { background: #e9d5ff; padding: 2px 4px; border-radius: 3px; }
+        .highlight-formula { background: #cffafe; padding: 2px 4px; border-radius: 3px; }
+
+        .download-section {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .chat-section {
+            display: none;
+            padding: 2rem;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 12px;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .chat-input {
+            padding: 1rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 12px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+        }
+
+        .message.ai {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        .topic-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .topic-tag {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid #dc2626;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* MathJax стили */
+        .MathJax {
+            font-size: 1em !important;
+        }
+
+        mjx-container[jax="CHTML"] {
+            line-height: 1.2;
+        }
+
+        @media (max-width: 768px) {
+            .analysis-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .progress-bar {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .progress-step::after {
+                display: none;
+            }
+
+            .download-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 ClassifyMyNotes</h1>
+            <p>Превратите ваши конспекты в структурированные знания с помощью AI</p>
+        </div>
+
+        <div class="main-content">
+            <div class="progress-bar">
+                <div class="progress-step active" id="step1">
+                    <div class="step-number">01</div>
+                    <div class="step-title">Загрузка файла</div>
+                </div>
+                <div class="progress-step" id="step2">
+                    <div class="step-number">02</div>
+                    <div class="step-title">OCR обработка</div>
+                </div>
+                <div class="progress-step" id="step3">
+                    <div class="step-number">03</div>
+                    <div class="step-title">Классификация</div>
+                </div>
+                <div class="progress-step" id="step4">
+                    <div class="step-number">04</div>
+                    <div class="step-title">Структуризация</div>
+                </div>
+                <div class="progress-step" id="step5">
+                    <div class="step-number">05</div>
+                    <div class="step-title">Обучение с AI</div>
+                </div>
+            </div>
+
+            <div class="content-section" id="uploadSection">
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">Загрузите ваш конспект</div>
+                    <div class="upload-subtext">Поддерживаются форматы: PDF, JPG, PNG, TXT</div>
+                    <button class="btn">Выбрать файл</button>
+                    <input type="file" id="fileInput" class="file-input" accept=".pdf,.jpg,.jpeg,.png,.txt">
+                </div>
+
+                <div id="loadingSection" style="display: none; text-align: center; padding: 2rem;">
+                    <div class="loading-spinner"></div>
+                    <p id="loadingText">Обрабатываем ваш документ...</p>
+                </div>
+
+                <div id="errorSection" style="display: none;">
+                    <div class="error-message">
+                        <strong>Ошибка обработки файла</strong>
+                        <p id="errorText">Что-то пошло не так. Попробуйте еще раз.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analysis-section" id="analysisSection">
+                <h2 style="margin-bottom: 2rem; color: #1e293b;">📊 Результаты анализа</h2>
+
+                <div class="topic-tags" id="topicTags">
+                    <!-- Теги тем будут добавлены динамически -->
+                </div>
+
+                <div class="analysis-grid">
+                    <div class="analysis-card card-definitions">
+                        <div class="card-title">
+                            🔍 <span>Определения</span>
+                        </div>
+                        <div class="card-content" id="definitionsCount">Анализируем...</div>
+                    </div>
+
+                    <div class="analysis-card card-examples">
+                        <div class="card-title">
+                            💡 <span>Примеры</span>
+                        </div>
+                        <div class="card-content" id="examplesCount">Анализируем...</div>
+                    </div>
+
+                    <div class="analysis-card card-theorems">
+                        <div class="card-title">
+                            📐 <span>Теоремы</span>
+                        </div>
+                        <div class="card-content" id="theoremsCount">Анализируем...</div>
+                    </div>
+
+                    <div class="analysis-card card-dates">
+                        <div class="card-title">
+                            📅 <span>Даты</span>
+                        </div>
+                        <div class="card-content" id="datesCount">Анализируем...</div>
+                    </div>
+
+                    <div class="analysis-card card-formulas">
+                        <div class="card-title">
+                            🔢 <span>Формулы</span>
+                        </div>
+                        <div class="card-content" id="formulasCount">Анализируем...</div>
+                    </div>
+                </div>
+
+                <div class="highlighted-text" id="highlightedText">
+                    <p style="color: #64748b; text-align: center;">Анализируем ваш конспект...</p>
+                </div>
+            </div>
+
+            <div class="download-section" id="downloadSection">
+                <h3 style="margin-bottom: 1rem; color: #1e293b;">📥 Скачать результаты</h3>
+                <div class="download-buttons">
+                    <button class="btn" onclick="downloadFile('pdf')">📄 Скачать PDF</button>
+                    <button class="btn" onclick="downloadFile('html')">🌐 Скачать HTML</button>
+                    <button class="btn btn-secondary" onclick="downloadFile('tex')">📝 Скачать LaTeX (.tex)</button>
+                    <button class="btn" onclick="playAudio()">🔊 Прослушать</button>
+                </div>
+            </div>
+
+            <div class="chat-section" id="chatSection">
+                <h3 style="margin-bottom: 1rem; color: #1e293b;">💬 Обсуждение с AI помощником</h3>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message ai">
+                            Привет! Я проанализирую ваш конспект и помогу с любыми вопросами. Загрузите файл, чтобы начать! 🤖
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" id="chatInput" placeholder="Задайте вопрос о вашем конспекте..." onkeypress="handleChatKeyPress(event)">
+                        <button class="btn" onclick="sendMessage()">Отправить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<script src="./app.js"></script>
